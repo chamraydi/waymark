@@ -219,11 +219,21 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mx-5 mb-3 rounded-2xl overflow-hidden border border-white/[0.07]" style={{ height: '200px' }}>
-                {mapLoaded && (
-                  <Suspense fallback={<div className="w-full h-full bg-[#111] flex items-center justify-center"><p className="text-white/20 text-sm">Loading map…</p></div>}>
-                    <TrailMap trails={filteredTrails} selectedTrail={selectedTrail} onTrailClick={handleCheckinClick} />
+              <div className="mx-5 mb-3 rounded-2xl overflow-hidden border border-white/[0.07]" style={{ height: '200px', position: 'relative' }}>
+                {mapLoaded ? (
+                  <Suspense fallback={
+                    <div style={{ width: '100%', height: '200px', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '13px' }}>Loading map…</p>
+                    </div>
+                  }>
+                    <div style={{ width: '100%', height: '200px' }}>
+                      <TrailMap trails={filteredTrails} selectedTrail={selectedTrail} onTrailClick={handleCheckinClick} />
+                    </div>
                   </Suspense>
+                ) : (
+                  <div style={{ width: '100%', height: '200px', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '13px' }}>Loading map…</p>
+                  </div>
                 )}
               </div>
 
