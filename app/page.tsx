@@ -7,8 +7,6 @@ import HealthDashboard from '@/components/HealthDashboard'
 import SocialFeed from '@/components/SocialFeed'
 import Leaderboard from '@/components/Leaderboard'
 import TrailEditor from '@/components/TrailEditor'
-import Shop from '@/components/Shop'
-import GPSTracking from '@/components/GPSTracking'
 
 const TrailMap = lazy(() => import('@/components/TrailMap'))
 
