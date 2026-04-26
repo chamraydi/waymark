@@ -2,7 +2,7 @@
 
 > The first adventure platform where every check-in is verified by a real human, powered by World ID.
 
-Built for **World Build Labs Hackathon 2026** by Raydi Cham.
+Built for **World Build Labs Hackathon 2026** by Raydi Cham 2026.
 
 ---
 
