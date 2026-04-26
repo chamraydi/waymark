@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Waymark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --g:#1D9E75;--gd:#0F6E56;--gx:#0a3d2a;--gg:rgba(29,158,117,0.14);
+  --b1:#090909;--b2:#111;--b3:#181818;--b4:#202020;
+  --br:rgba(255,255,255,0.06);--br2:rgba(255,255,255,0.12);
+  --t1:#fff;--t2:rgba(255,255,255,0.55);--t3:rgba(255,255,255,0.3);--t4:rgba(255,255,255,0.13);
+  --am:#EF9F27;--rd:#E24B4A;--bl:#3B8BEB;
+  --r:16px;--rs:10px;--rl:22px
+}
+html,body{height:100%;background:#000;font-family:'DM Sans',sans-serif;overflow:hidden}
+.shell{max-width:390px;margin:0 auto;height:100vh;display:flex;flex-direction:column;background:var(--b1);position:relative;overflow:hidden}
+
+/* Status bar */
+.sb{display:flex;justify-content:space-between;align-items:center;padding:12px 18px 6px;flex-shrink:0;z-index:10}
+.sb-time{font-size:12px;font-weight:500;color:var(--t3)}
+.wld-pill{display:flex;align-items:center;gap:5px;background:var(--gg);border:0.5px solid rgba(29,158,117,0.3);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--g);transition:all .25s;cursor:default}
+.wld-pill.bump{transform:scale(1.12);background:rgba(29,158,117,0.28)}
+
+/* Screens */
+.screen{display:none;flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:88px;-webkit-overflow-scrolling:touch}
+.screen.on{display:block;animation:fup .22s ease both}
+@keyframes fup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* GPS tracking screen - fullscreen */
+.gps-screen{display:none;position:fixed;inset:0;z-index:200;background:var(--b1);flex-direction:column;max-width:390px;margin:0 auto}
+.gps-screen.on{display:flex}
+
+/* Tab bar */
+.tabbar{position:absolute;bottom:0;left:0;right:0;background:rgba(9,9,9,0.94);backdrop-filter:blur(28px);border-top:0.5px solid var(--br);display:flex;justify-content:space-around;padding:9px 0 22px;z-index:50}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 8px;transition:opacity .15s}
+.tab-lbl{font-size:9px;font-weight:500;color:var(--t4);letter-spacing:.03em;transition:color .15s}
+.tab.on .tab-lbl{color:var(--g)}
+
+/* Page header */
+.ph{padding:10px 18px 14px;display:flex;justify-content:space-between;align-items:flex-start}
+.ph-title{font-size:23px;font-weight:600;letter-spacing:-.5px;color:var(--t1)}
+.ph-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.ava{width:35px;height:35px;border-radius:50%;background:var(--gd);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0}
+
+/* Cards */
+.card{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);padding:15px;margin:0 15px 10px}
+.clabel{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--t4);margin-bottom:8px}
+
+/* Recovery */
+.rec-card{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);padding:16px;margin:0 15px 10px;display:flex;align-items:center;gap:14px}
+.rec-score{font-size:46px;font-weight:600;color:var(--g);line-height:1;letter-spacing:-2px}
+.rec-state{font-size:13px;color:var(--t2);margin-top:3px}
+.rec-detail{font-size:11px;color:var(--t4);margin-top:7px;font-family:'DM Mono',monospace}
+
+/* Metric grid */
+.mg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 15px 10px}
+.mc{background:var(--b3);border:0.5px solid var(--br);border-radius:var(--rs);padding:11px 8px;text-align:center}
+.mc-val{font-size:17px;font-weight:600;color:var(--t1);line-height:1}
+.mc-unit{font-size:10px;color:var(--t3)}
+.mc-key{font-size:9px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--t4);margin-top:3px}
+.mc.green .mc-val{color:var(--g)}.mc.amber .mc-val{color:var(--am)}
+
+/* WLD card */
+.wld-card{background:var(--b2);border:0.5px solid rgba(29,158,117,0.18);border-radius:var(--r);padding:14px;margin:0 15px 10px;display:flex;align-items:center;gap:11px}
+.wld-icon{width:38px;height:38px;border-radius:11px;background:var(--gg);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.wld-num{font-size:22px;font-weight:600;color:var(--g)}
+
+/* CTA button */
+.cta{background:var(--g);border:none;border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:11px;margin:0 15px 14px;cursor:pointer;width:calc(100% - 30px);text-align:left;transition:opacity .15s,transform .1s;font-family:'DM Sans',sans-serif}
+.cta:active{opacity:.85;transform:scale(.99)}
+.cta-icon{width:36px;height:36px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cta-title{font-size:14px;font-weight:600;color:#fff}
+.cta-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:1px}
+
+/* Section title */
+.st{font-size:12px;font-weight:500;color:var(--t3);padding:2px 18px 9px}
+
+/* Trail card */
+.tc{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);padding:13px;margin:0 15px 8px;display:flex;align-items:center;gap:11px;cursor:pointer;transition:border-color .15s,transform .1s}
+.tc:active{transform:scale(.99)}
+.tc:hover{border-color:var(--br2)}
+.tc-thumb{width:44px;height:44px;border-radius:12px;background:var(--gd);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.tc-name{font-size:14px;font-weight:500;color:var(--t1);margin-bottom:1px}
+.tc-meta{font-size:11px;color:var(--t4)}
+.vp{display:inline-flex;align-items:center;gap:4px;background:rgba(29,158,117,.1);border:0.5px solid rgba(29,158,117,.22);border-radius:20px;padding:2px 8px;font-size:10px;color:var(--g);font-weight:500;margin-top:3px}
+.vdot{width:5px;height:5px;border-radius:50%;background:var(--g);flex-shrink:0}
+.diff{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;flex-shrink:0}
+.diff.e{background:rgba(29,158,117,.15);color:var(--g)}
+.diff.m{background:rgba(239,159,39,.15);color:var(--am)}
+.diff.h{background:rgba(226,75,74,.15);color:var(--rd)}
+
+/* Explore sub-tabs */
+.sub-tabs{display:flex;gap:1px;background:var(--b3);border-radius:var(--rs);padding:3px;margin:0 15px 12px}
+.sub-tab{flex:1;padding:7px 4px;border-radius:8px;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .15s}
+.sub-tab.on{background:var(--b2);color:var(--t1)}
+
+/* Search */
+.search-wrap{margin:0 15px 11px;background:var(--b3);border:0.5px solid var(--br2);border-radius:var(--rs);display:flex;align-items:center;gap:8px;padding:10px 13px}
+.search-wrap input{background:none;border:none;outline:none;color:var(--t1);font-family:'DM Sans',sans-serif;font-size:14px;flex:1}
+.search-wrap input::placeholder{color:var(--t4)}
+
+/* Filters */
+.filters{display:flex;gap:7px;padding:0 15px 12px;overflow-x:auto;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.fp{background:var(--b3);border:0.5px solid var(--br);border-radius:20px;padding:5px 13px;font-size:12px;font-weight:500;color:var(--t3);white-space:nowrap;cursor:pointer;transition:all .15s;flex-shrink:0}
+.fp.on{background:var(--gg);border-color:var(--g);color:var(--g)}
+
+/* REAL MAP */
+#leafletMap{width:100%;height:210px;border-radius:var(--r);overflow:hidden;margin:0 15px 12px;width:calc(100% - 30px)}
+.leaflet-container{background:#111!important;font-family:'DM Sans',sans-serif!important}
+.leaflet-tile{filter:brightness(.6) saturate(.5) hue-rotate(15deg)!important}
+.leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:#333!important;font-size:9px!important}
+.leaflet-control-attribution a{color:#333!important}
+.leaflet-control-zoom a{background:#191919!important;color:white!important;border-color:rgba(255,255,255,.08)!important;font-size:14px!important}
+
+/* Modal */
+.modal-ov{display:none;position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);align-items:flex-end;justify-content:center}
+.modal-ov.open{display:flex}
+.modal{background:var(--b2);border:0.5px solid var(--br2);border-radius:24px 24px 0 0;padding:22px 18px 42px;width:100%;max-width:390px;animation:sup .32s ease both;max-height:90vh;overflow-y:auto}
+@keyframes sup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:36px;height:4px;background:var(--t4);border-radius:2px;margin:0 auto 18px}
+.btn-g{background:var(--g);border:none;border-radius:var(--r);padding:14px;width:100%;color:#fff;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s;margin-top:2px}
+.btn-g:hover{opacity:.9}
+.btn-back{background:none;border:none;color:var(--t3);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:13px;padding:0}
+.cond-tag{background:var(--b3);border:0.5px solid var(--br2);border-radius:20px;padding:7px 13px;font-size:12px;color:var(--t2);cursor:pointer;transition:all .15s}
+.cond-tag.sel{background:var(--gg);border-color:var(--g);color:var(--g);font-weight:500}
+.ms-cell{background:var(--b3);border-radius:var(--rs);padding:10px;text-align:center}
+.ms-val{font-size:15px;font-weight:600;color:var(--t1)}
+.ms-key{font-size:9px;color:var(--t4);margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+.step{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--br)}
+.step:last-child{border-bottom:none}
+.step-n{width:23px;height:23px;border-radius:50%;background:var(--b3);border:0.5px solid var(--br2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--g);flex-shrink:0}
+.spin{width:54px;height:54px;border:2px solid rgba(29,158,117,.15);border-top-color:var(--g);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══ GPS TRACKING SCREEN ══ */
+.gps-map{flex:1;position:relative;min-height:0}
+#gpsMap{width:100%;height:100%}
+.gps-map .leaflet-tile{filter:brightness(.5) saturate(.4) hue-rotate(15deg)!important}
+
+/* GPS overlay - top bar */
+.gps-topbar{position:absolute;top:0;left:0;right:0;z-index:10;padding:48px 18px 16px;background:linear-gradient(to bottom,rgba(9,9,9,.95) 0%,rgba(9,9,9,.7) 60%,transparent 100%)}
+.gps-trail-name{font-size:16px;font-weight:600;color:var(--t1);margin-bottom:2px}
+.gps-status-row{display:flex;align-items:center;gap:8px}
+.gps-status-dot{width:7px;height:7px;border-radius:50%;background:var(--g);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+.gps-status-txt{font-size:12px;color:var(--g);font-weight:500}
+.gps-time-badge{margin-left:auto;background:rgba(9,9,9,.7);border:0.5px solid var(--br2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500;color:var(--t2);font-family:'DM Mono',monospace}
+
+/* GPS close */
+.gps-close{position:absolute;top:44px;right:18px;z-index:20;width:32px;height:32px;border-radius:50%;background:rgba(9,9,9,.8);border:0.5px solid var(--br2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:18px;line-height:1}
+
+/* GPS bottom panel */
+.gps-panel{background:var(--b1);border-radius:24px 24px 0 0;border-top:0.5px solid var(--br2);padding:16px 18px 36px;flex-shrink:0;z-index:10}
+
+/* GPS big metrics */
+.gps-metrics-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--br);border:0.5px solid var(--br);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.gps-metric{background:var(--b2);padding:14px 8px;text-align:center}
+.gps-big{font-size:26px;font-weight:600;color:var(--t1);line-height:1;font-family:'DM Mono',monospace}
+.gps-unit{font-size:10px;color:var(--t3);margin-top:1px}
+.gps-key{font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-top:3px}
+.gps-metric.green .gps-big{color:var(--g)}
+.gps-metric.amber .gps-big{color:var(--am)}
+.gps-metric.red .gps-big{color:var(--rd)}
+
+/* GPS secondary metrics */
+.gps-sec{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px}
+.gps-sc{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--rs);padding:10px 6px;text-align:center}
+.gps-sv{font-size:14px;font-weight:600;color:var(--t1)}
+.gps-sk{font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+
+/* GPS controls */
+.gps-controls{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:4px}
+.gps-btn{border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.gps-btn:active{transform:scale(.93)}
+.gps-btn-sm{width:48px;height:48px;background:var(--b3);border:0.5px solid var(--br2)}
+.gps-btn-play{width:72px;height:72px;background:var(--g)}
+.gps-btn-stop{width:52px;height:52px;background:rgba(226,75,74,.15);border:0.5px solid rgba(226,75,74,.3)}
+.gps-btn-sos{width:52px;height:52px;background:var(--rd);border:none}
+
+/* HR badge on map */
+.hr-badge{position:absolute;bottom:16px;right:16px;z-index:10;background:rgba(9,9,9,.85);border:0.5px solid var(--br2);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px}
+.hr-val{font-size:20px;font-weight:600;color:var(--rd);font-family:'DM Mono',monospace}
+.hr-label{font-size:10px;color:var(--t3)}
+.hr-icon{animation:heartbeat .8s ease-in-out infinite}
+@keyframes heartbeat{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+
+/* ══ LEADERBOARD ══ */
+.period-toggle{display:flex;gap:1px;background:var(--b3);border-radius:var(--rs);padding:3px;margin:0 15px 11px}
+.pt{flex:1;padding:7px;border-radius:8px;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .15s}
+.pt.on{background:var(--b2);color:var(--t1)}
+.cat-filters{display:flex;gap:7px;padding:0 15px 12px;overflow-x:auto;scrollbar-width:none}
+.cf{background:var(--b3);border:0.5px solid var(--br);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.cf.on{background:var(--gg);border-color:var(--g);color:var(--g)}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:14px 18px 18px}
+.pod{display:flex;flex-direction:column;align-items:center;gap:5px}
+.lb-list{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);margin:0 15px 10px;overflow:hidden}
+.lb-row{display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:0.5px solid var(--br)}
+.lb-row:last-child{border-bottom:none}
+.lb-row.you{background:rgba(29,158,117,.06)}
+.lb-rank{font-size:12px;font-family:'DM Mono',monospace;color:var(--t4);width:16px;text-align:center;flex-shrink:0}
+.lb-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
+.you-badge{font-size:9px;color:var(--g);background:var(--gg);padding:1px 6px;border-radius:20px;margin-left:3px}
+
+/* ══ EDIT TRAILS ══ */
+.edit-trail{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);padding:13px;margin:0 15px 9px}
+.edit-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.edit-field{background:var(--b3);border:0.5px solid var(--br2);border-radius:var(--rs);padding:9px;cursor:pointer;transition:all .15s}
+.edit-field:hover{border-color:rgba(29,158,117,.3)}
+.ef-label{font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.ef-val{font-size:12px;font-weight:500;color:var(--t2)}
+
+/* ══ FEED ══ */
+.fc{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);padding:14px;margin:0 15px 9px}
+.fc-footer{display:flex;align-items:center;gap:8px;padding-top:8px;border-top:0.5px solid var(--br)}
+.like-btn{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--t4);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .15s}
+.like-btn.liked{color:var(--g)}
+
+/* ══ HEALTH ══ */
+.src-row{display:flex;gap:7px;padding:0 15px 12px;flex-wrap:wrap}
+
+/* ══ SHOP ══ */
+.shop-banner{margin:0 15px 14px;border-radius:var(--r);background:linear-gradient(135deg,#0a2a1e 0%,#0F6E56 100%);padding:18px;display:flex;align-items:center;gap:14px;border:0.5px solid rgba(29,158,117,.3)}
+.shop-cat-scroll{display:flex;gap:8px;padding:0 15px 12px;overflow-x:auto;scrollbar-width:none}
+.shop-cat-scroll::-webkit-scrollbar{display:none}
+.shop-cat{background:var(--b3);border:0.5px solid var(--br);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:500;color:var(--t3);white-space:nowrap;cursor:pointer;transition:all .15s;flex-shrink:0}
+.shop-cat.on{background:var(--gg);border-color:var(--g);color:var(--g)}
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 15px 10px}
+.shop-item{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s,transform .12s}
+.shop-item:active{transform:scale(.98)}
+.shop-item:hover{border-color:var(--br2)}
+.shop-item-img{height:120px;display:flex;align-items:center;justify-content:center;font-size:52px;background:var(--b3)}
+.shop-item-body{padding:11px 12px}
+.shop-item-name{font-size:13px;font-weight:500;color:var(--t1);margin-bottom:3px}
+.shop-item-brand{font-size:10px;color:var(--t4);margin-bottom:8px}
+.shop-item-price{display:flex;align-items:center;justify-content:space-between}
+.wld-price{font-size:14px;font-weight:600;color:var(--g)}
+.wld-price small{font-size:10px;font-weight:400;color:var(--g);opacity:.7}
+.buy-btn{background:var(--gg);border:0.5px solid rgba(29,158,117,.3);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--g);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.buy-btn:hover{background:var(--g);color:#fff}
+.badge-new{font-size:9px;font-weight:600;color:#fff;background:var(--rd);border-radius:4px;padding:1px 5px;margin-left:5px}
+.badge-sale{font-size:9px;font-weight:600;color:#fff;background:var(--am);border-radius:4px;padding:1px 5px;margin-left:5px}
+.shop-item-full{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);padding:14px;margin:0 15px 10px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:border-color .15s}
+.shop-item-full:hover{border-color:var(--br2)}
+.shop-item-full-img{width:70px;height:70px;background:var(--b3);border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:34px;flex-shrink:0}
+
+/* Profile */
+.prof-header{display:flex;align-items:center;gap:14px;padding:10px 18px 18px}
+.prof-av{width:62px;height:62px;border-radius:50%;background:var(--gd);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:600;color:#fff;border:2px solid rgba(29,158,117,.3);flex-shrink:0}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--br);border:0.5px solid var(--br);border-radius:var(--r);overflow:hidden;margin:0 15px 11px}
+.sg-cell{background:var(--b2);padding:13px 6px;text-align:center}
+.sg-num{font-size:19px;font-weight:600;color:var(--t1)}
+.sg-key{font-size:9px;color:var(--t4);margin-top:2px}
+.ci-list{background:var(--b2);border:0.5px solid var(--br);border-radius:var(--r);margin:0 15px 10px;overflow:hidden}
+.ci-row{display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:0.5px solid var(--br)}
+.ci-row:last-child{border-bottom:none}
+.ci-icon{width:34px;height:34px;border-radius:9px;background:var(--gd);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+
+/* Toast */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--g);color:#fff;font-size:13px;font-weight:500;padding:10px 20px;border-radius:20px;z-index:300;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;max-width:340px;text-align:center}
+.toast.show{opacity:1}
+
+/* SOS modal */
+.sos-modal{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.9);backdrop-filter:blur(12px);align-items:center;justify-content:center}
+.sos-modal.open{display:flex}
+.sos-box{background:#1a0808;border:1px solid rgba(226,75,74,.4);border-radius:24px;padding:32px 24px;width:320px;text-align:center}
+.sos-ring{width:80px;height:80px;border-radius:50%;background:rgba(226,75,74,.15);border:2px solid var(--rd);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;animation:sosring 1s ease-in-out infinite alternate}
+@keyframes sosring{from{box-shadow:0 0 0 0 rgba(226,75,74,.4)}to{box-shadow:0 0 0 20px rgba(226,75,74,0)}}
+
+/* Buy success */
+.buy-success-anim{animation:buypop .4s ease}
+@keyframes buypop{0%{transform:scale(.9)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+
+/* Green note */
+.green-note{background:var(--gx);border:0.5px solid rgba(29,158,117,.2);border-radius:var(--rs);padding:11px 13px;margin:0 15px 10px}
+.world-chain-note{background:var(--b2);border:0.5px solid rgba(29,158,117,.15);border-radius:var(--r);padding:13px;margin:0 15px 10px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Status bar -->
+  <div class="sb">
+    <span class="sb-time">9:41</span>
+    <div class="wld-pill" id="wldPill">⚡ <span id="wldVal">20</span> WLD</div>
+  </div>
+
+  <!-- ═══ HOME ═══ -->
+  <div class="screen on" id="s-home">
+    <div class="ph">
+      <div><div class="ph-title">Waymark</div><div class="ph-sub">Good morning, Raydi</div></div>
+      <div class="ava">RC</div>
+    </div>
+    <div class="rec-card">
+      <div style="flex:1">
+        <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Recovery</div>
+        <div class="rec-score">84</div>
+        <div class="rec-state">Ready to push</div>
+        <div class="rec-detail">HRV 62ms · HR 52bpm · Sleep 7.6h</div>
+      </div>
+      <svg width="68" height="68" viewBox="0 0 68 68">
+        <circle cx="34" cy="34" r="28" fill="none" stroke="#181818" stroke-width="6"/>
+        <circle cx="34" cy="34" r="28" fill="none" stroke="#1D9E75" stroke-width="6"
+          stroke-dasharray="175.9" stroke-dashoffset="28" stroke-linecap="round" transform="rotate(-90 34 34)"/>
+        <text x="34" y="38" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="600" fill="#1D9E75">84%</text>
+      </svg>
+    </div>
+    <div class="mg">
+      <div class="mc green"><div class="mc-val">62<span class="mc-unit">ms</span></div><div class="mc-key">HRV</div></div>
+      <div class="mc"><div class="mc-val">52</div><div class="mc-key">Resting HR</div></div>
+      <div class="mc amber"><div class="mc-val">7.6<span class="mc-unit">h</span></div><div class="mc-key">Sleep</div></div>
+    </div>
+    <div class="wld-card">
+      <div class="wld-icon">⚡</div>
+      <div style="flex:1">
+        <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">WLD Earned</div>
+        <div class="wld-num" id="homeWld">20 <span style="font-size:13px;font-weight:400;color:var(--t3)">WLD</span></div>
+        <div style="font-size:11px;color:var(--t4);margin-top:2px" id="homeWldSub">Earned from 3 verified check-ins</div>
+      </div>
+      <button onclick="switchTab('shop')" style="background:var(--gg);border:0.5px solid rgba(29,158,117,.3);border-radius:10px;padding:8px 12px;font-size:11px;font-weight:600;color:var(--g);cursor:pointer;font-family:'DM Sans',sans-serif">Shop →</button>
+    </div>
+    <button class="cta" onclick="switchTab('explore')">
+      <div class="cta-icon"><svg width="21" height="21" viewBox="0 0 21 21" fill="none"><circle cx="10.5" cy="10.5" r="8.5" stroke="white" stroke-width="1.5"/><circle cx="10.5" cy="10.5" r="3.5" fill="white"/></svg></div>
+      <div><div class="cta-title">Find an adventure to check in</div><div class="cta-sub">Earn WLD · Verified by World ID</div></div>
+    </button>
+    <div id="recentCIs"></div>
+    <div class="st">Nearby adventures</div>
+    <div id="homeTrails"></div>
+  </div>
+
+  <!-- ═══ EXPLORE ═══ -->
+  <div class="screen" id="s-explore">
+    <div class="ph"><div><div class="ph-title">Explore</div></div></div>
+    <div class="sub-tabs">
+      <button class="sub-tab on" onclick="setExView('discover',this)">Discover</button>
+      <button class="sub-tab" onclick="setExView('leaderboard',this)">🏆 Board</button>
+      <button class="sub-tab" onclick="setExView('edit',this)">✏️ Edit</button>
+    </div>
+
+    <!-- DISCOVER -->
+    <div id="exDiscover">
+      <div class="search-wrap">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="rgba(255,255,255,.28)" stroke-width="1.4"/><path d="M10 10l3 3" stroke="rgba(255,255,255,.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search trails, peaks, cities..." oninput="filterTrails(this.value)">
+      </div>
+      <div class="filters">
+        <div class="fp on" onclick="setFilter('All',this)">All</div>
+        <div class="fp" onclick="setFilter('Trail',this)">Trail</div>
+        <div class="fp" onclick="setFilter('Peak',this)">Peak</div>
+        <div class="fp" onclick="setFilter('Urban',this)">Urban</div>
+        <div class="fp" onclick="setFilter('Marathon',this)">Marathon</div>
+      </div>
+      <!-- REAL LEAFLET MAP -->
+      <div id="leafletMap"></div>
+      <div class="st" id="exploreCount">8 adventures in Malaysia</div>
+      <div id="exploreTrails"></div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div id="exLeaderboard" style="display:none">
+      <div class="period-toggle">
+        <button class="pt on" onclick="setPeriod('week',this)">This week</button>
+        <button class="pt" onclick="setPeriod('month',this)">Month</button>
+        <button class="pt" onclick="setPeriod('alltime',this)">All time</button>
+      </div>
+      <div class="cat-filters">
+        <div class="cf on" onclick="setCat('adventures',this)">🏔 Adventures</div>
+        <div class="cf" onclick="setCat('distance',this)">📍 Distance</div>
+        <div class="cf" onclick="setCat('wld',this)">⚡ WLD</div>
+      </div>
+      <div class="podium" id="podium"></div>
+      <div class="lb-list" id="lbList"></div>
+      <div class="green-note"><p style="font-size:13px;font-weight:500;color:var(--g)">⚡ WLD rewards per verified check-in</p><small style="font-size:11px;color:rgba(29,158,117,.5)">Only World ID verified humans appear here.</small></div>
+    </div>
+
+    <!-- EDIT -->
+    <div id="exEdit" style="display:none">
+      <div style="padding:0 18px 11px;display:flex;align-items:center;gap:6px"><div style="width:6px;height:6px;border-radius:50%;background:var(--g)"></div><span style="font-size:11px;color:var(--t3)">World ID required · No bots</span></div>
+      <div id="editList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ FEED ═══ -->
+  <div class="screen" id="s-feed">
+    <div class="ph"><div><div class="ph-title">Feed</div><div class="ph-sub">Real adventures · Verified humans only</div></div></div>
+    <div style="padding:0 18px 11px;display:flex;align-items:center;gap:6px"><div style="width:6px;height:6px;border-radius:50%;background:var(--g);animation:pulse 2s infinite"></div><span style="font-size:11px;color:var(--t3)">Only verified humans appear here</span></div>
+    <div id="feedList"></div>
+  </div>
+
+  <!-- ═══ HEALTH ═══ -->
+  <div class="screen" id="s-health">
+    <div class="ph"><div><div class="ph-title">Health</div><div class="ph-sub">Your adventure readiness</div></div></div>
+    <div class="src-row">
+      <div style="display:flex;align-items:center;gap:5px;background:var(--b3);border:0.5px solid var(--br);border-radius:20px;padding:5px 11px"><div style="width:5px;height:5px;border-radius:50%;background:var(--am)"></div><span style="font-size:11px;color:var(--t3);font-weight:500">V2 Health layer</span></div>
+      <button id="appleBtn" onclick="connectApple()" style="display:flex;align-items:center;gap:5px;background:var(--b3);border:0.5px solid var(--br);border-radius:20px;padding:5px 13px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--t3);cursor:pointer">🍎 Connect Apple Health</button>
+    </div>
+    <div class="rec-card">
+      <div style="flex:1">
+        <div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Recovery Score</div>
+        <div id="hRecScore" style="font-size:46px;font-weight:600;color:var(--g);line-height:1;letter-spacing:-2px">84</div>
+        <div id="hRecState" style="font-size:13px;color:var(--t2);margin-top:3px">Ready to push</div>
+        <div id="hRecDetail" style="font-size:11px;color:var(--t4);margin-top:7px;font-family:'DM Mono',monospace">HRV 62ms · HR 52bpm · Sleep 7.6h</div>
+      </div>
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r="30" fill="none" stroke="#181818" stroke-width="7"/>
+        <circle id="hRing" cx="36" cy="36" r="30" fill="none" stroke="#1D9E75" stroke-width="7"
+          stroke-dasharray="188.5" stroke-dashoffset="30" stroke-linecap="round" transform="rotate(-90 36 36)"/>
+        <text id="hPct" x="36" y="40" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="12" font-weight="600" fill="#1D9E75">84%</text>
+      </svg>
+    </div>
+    <div class="mg">
+      <div class="mc green"><div class="mc-val">62<span class="mc-unit">ms</span></div><div class="mc-key">HRV</div></div>
+      <div class="mc"><div class="mc-val">52</div><div class="mc-key">Resting HR</div></div>
+      <div class="mc amber"><div class="mc-val">7.6<span class="mc-unit">h</span></div><div class="mc-key">Sleep</div></div>
+      <div class="mc amber"><div class="mc-val">14.2</div><div class="mc-key">Strain</div></div>
+      <div class="mc"><div class="mc-val">8,432</div><div class="mc-key">Steps</div></div>
+      <div class="mc"><div class="mc-val">2,140</div><div class="mc-key">Calories</div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px"><span style="font-size:13px;font-weight:500;color:var(--t1)">VO2 Max</span><span style="font-size:11px;color:var(--g);background:var(--gg);padding:2px 8px;border-radius:20px">Above average</span></div>
+      <div style="display:flex;align-items:flex-end;gap:7px;margin-bottom:7px"><span style="font-size:30px;font-weight:600;color:var(--t1)">48</span><span style="font-size:12px;color:var(--t3);margin-bottom:3px">mL/kg/min</span></div>
+      <div style="height:5px;background:var(--b3);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--g);border-radius:3px;width:80%"></div></div>
+    </div>
+    <div class="green-note"><p style="font-size:13px;font-weight:500;color:var(--g);margin-bottom:2px">You're ready for an adventure today</p><small style="font-size:11px;color:rgba(29,158,117,.5)">High recovery. Bukit Tabur West is a great match for your biometrics.</small></div>
+    <div class="card">
+      <div class="clabel">Connect health sources</div>
+      <div id="sourceList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ SHOP ═══ -->
+  <div class="screen" id="s-shop">
+    <div class="ph"><div><div class="ph-title">Shop</div><div class="ph-sub">Buy gear with your WLD coins</div></div></div>
+    <div class="shop-banner">
+      <div>
+        <div style="font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:4px">Your balance</div>
+        <div style="font-size:28px;font-weight:600;color:#fff;line-height:1">⚡ <span id="shopWld">20</span></div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:3px">WLD coins · Earned from adventures</div>
+      </div>
+      <div style="margin-left:auto;text-align:center">
+        <div style="font-size:32px">🏪</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">Earn more by<br>checking in</div>
+      </div>
+    </div>
+    <div class="shop-cat-scroll">
+      <div class="shop-cat on" onclick="setShopCat('All',this)">All gear</div>
+      <div class="shop-cat" onclick="setShopCat('Running',this)">Running</div>
+      <div class="shop-cat" onclick="setShopCat('Hiking',this)">Hiking</div>
+      <div class="shop-cat" onclick="setShopCat('Wearables',this)">Wearables</div>
+      <div class="shop-cat" onclick="setShopCat('Apparel',this)">Apparel</div>
+      <div class="shop-cat" onclick="setShopCat('Accessories',this)">Accessories</div>
+    </div>
+    <div id="shopGrid"></div>
+  </div>
+
+  <!-- ═══ PROFILE ═══ -->
+  <div class="screen" id="s-profile">
+    <div class="prof-header">
+      <div class="prof-av">RC</div>
+      <div>
+        <div style="font-size:20px;font-weight:600;color:var(--t1)">Raydi Cham</div>
+        <div style="font-size:12px;color:var(--t4);margin-top:2px">Kuala Lumpur, Malaysia</div>
+        <div style="display:inline-flex;align-items:center;gap:5px;background:var(--gg);border:0.5px solid rgba(29,158,117,.2);border-radius:20px;padding:3px 10px;margin-top:7px">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#1D9E75" stroke-width="1"/><circle cx="5" cy="5" r="1.5" fill="#1D9E75"/></svg>
+          <span style="font-size:11px;font-weight:500;color:var(--g)">World ID verified</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="sg-cell"><div class="sg-num" id="profAdv">27</div><div class="sg-key">Adventures</div></div>
+      <div class="sg-cell"><div class="sg-num">142km</div><div class="sg-key">Distance</div></div>
+      <div class="sg-cell"><div class="sg-num" id="profWld">20</div><div class="sg-key">WLD</div></div>
+      <div class="sg-cell"><div class="sg-num" style="color:var(--g)">100%</div><div class="sg-key">Verified</div></div>
+    </div>
+    <div class="wld-card" style="background:var(--gx);border-color:rgba(29,158,117,.2)">
+      <div class="wld-icon">⚡</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--g);margin-bottom:2px">WLD Rewards</div><div class="wld-num" id="profWldBig">20 WLD</div><div style="font-size:11px;color:var(--t4);margin-top:2px">Earned from verified adventures</div></div>
+    </div>
+    <div class="st">Recent check-ins</div>
+    <div class="ci-list" id="profCIs"></div>
+    <div class="world-chain-note">
+      <div style="font-size:13px;font-weight:500;color:var(--g);margin-bottom:3px">Proof of presence on World Chain</div>
+      <div style="font-size:11px;color:var(--t4);line-height:1.7">Every check-in is a zero-knowledge proof on World Chain. Verified, tamper-proof, human-guaranteed.</div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabbar">
+    <div class="tab on" id="tab-home" onclick="switchTab('home')">
+      <svg width="21" height="21" viewBox="0 0 21 21" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="#1D9E75" stroke-width="1.5"/><circle cx="10.5" cy="10.5" r="2.5" fill="#1D9E75"/></svg>
+      <div class="tab-lbl" style="color:var(--g)">Home</div>
+    </div>
+    <div class="tab" id="tab-explore" onclick="switchTab('explore')">
+      <svg width="21" height="21" viewBox="0 0 21 21" fill="none"><rect x="3" y="3" width="15" height="15" rx="4" stroke="#444" stroke-width="1.5"/><circle cx="10.5" cy="10.5" r="2.8" stroke="#444" stroke-width="1.5"/></svg>
+      <div class="tab-lbl">Explore</div>
+    </div>
+    <div class="tab" id="tab-feed" onclick="switchTab('feed')">
+      <svg width="21" height="21" viewBox="0 0 21 21" fill="none"><path d="M3 6h15M3 10.5h15M3 15h9" stroke="#444" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="tab-lbl">Feed</div>
+    </div>
+    <div class="tab" id="tab-shop" onclick="switchTab('shop')">
+      <svg width="21" height="21" viewBox="0 0 21 21" fill="none"><path d="M3 5h15l-2 8H5L3 5z" stroke="#444" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8" cy="17" r="1.5" stroke="#444" stroke-width="1.2"/><circle cx="14" cy="17" r="1.5" stroke="#444" stroke-width="1.2"/></svg>
+      <div class="tab-lbl">Shop</div>
+    </div>
+    <div class="tab" id="tab-profile" onclick="switchTab('profile')">
+      <svg width="21" height="21" viewBox="0 0 21 21" fill="none"><circle cx="10.5" cy="7.5" r="3.5" stroke="#444" stroke-width="1.5"/><path d="M3.5 18c0-3.9 3.1-7 7-7s7 3.1 7 7" stroke="#444" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="tab-lbl">Me</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GPS TRACKING SCREEN ═══ -->
+<div class="gps-screen" id="gpsScreen" style="max-width:390px;left:50%;transform:translateX(-50%)">
+  <div class="gps-map" style="position:relative">
+    <div id="gpsMap"></div>
+    <div class="gps-topbar">
+      <div class="gps-trail-name" id="gpsTrailName">Bukit Tabur West</div>
+      <div class="gps-status-row">
+        <div class="gps-status-dot" id="gpsStatusDot"></div>
+        <div class="gps-status-txt" id="gpsStatusTxt">Tracking active</div>
+        <div class="gps-time-badge" id="gpsClock">09:41</div>
+      </div>
+    </div>
+    <div class="gps-close" onclick="stopGPS()">✕</div>
+    <div class="hr-badge">
+      <div class="hr-icon" style="font-size:16px">❤️</div>
+      <div><div class="hr-val" id="gpsHR">142</div><div class="hr-label">bpm</div></div>
+    </div>
+  </div>
+  <div class="gps-panel">
+    <div class="gps-metrics-row">
+      <div class="gps-metric green">
+        <div class="gps-big" id="gpsDist">0.00</div>
+        <div class="gps-unit">km</div>
+        <div class="gps-key">Distance</div>
+      </div>
+      <div class="gps-metric">
+        <div class="gps-big" id="gpsPace">0:00</div>
+        <div class="gps-unit">min/km</div>
+        <div class="gps-key">Pace</div>
+      </div>
+      <div class="gps-metric amber">
+        <div class="gps-big" id="gpsTime">00:00</div>
+        <div class="gps-unit"> </div>
+        <div class="gps-key">Duration</div>
+      </div>
+    </div>
+    <div class="gps-sec">
+      <div class="gps-sc"><div class="gps-sv" id="gpsSpeed">0.0</div><div class="gps-sk">km/h</div></div>
+      <div class="gps-sc"><div class="gps-sv" id="gpsElev">0m</div><div class="gps-sk">Elev</div></div>
+      <div class="gps-sc"><div class="gps-sv" id="gpsCal">0</div><div class="gps-sk">Cal</div></div>
+      <div class="gps-sc"><div class="gps-sv" id="gpsSteps">0</div><div class="gps-sk">Steps</div></div>
+    </div>
+    <div class="gps-controls">
+      <button class="gps-btn gps-btn-sos" onclick="openSOS()" title="Emergency SOS">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4v8M11 15v2" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </button>
+      <button class="gps-btn gps-btn-sm" id="gpsPauseBtn" onclick="togglePause()">
+        <svg id="pauseIcon" width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="4" width="3.5" height="12" rx="1.5" fill="rgba(255,255,255,0.7)"/><rect x="11.5" y="4" width="3.5" height="12" rx="1.5" fill="rgba(255,255,255,0.7)"/></svg>
+      </button>
+      <button class="gps-btn gps-btn-play" id="gpsPlayBtn" onclick="togglePlay()" style="position:relative">
+        <svg id="playIcon" width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M10 8l12 6-12 6V8z" fill="white"/></svg>
+      </button>
+      <button class="gps-btn gps-btn-sm" onclick="finishGPS()">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="5" y="5" width="10" height="10" rx="2" fill="rgba(226,75,74,0.8)"/></svg>
+      </button>
+      <button class="gps-btn gps-btn-sm" onclick="stopGPS()" style="font-size:13px;color:var(--t3)">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- Check-in Modal -->
+<div class="modal-ov" id="modalOv" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<!-- SOS Modal -->
+<div class="sos-modal" id="sosModal">
+  <div class="sos-box">
+    <div class="sos-ring">🆘</div>
+    <div style="font-size:20px;font-weight:600;color:var(--rd);margin-bottom:8px">Emergency SOS</div>
+    <div style="font-size:13px;color:var(--t3);margin-bottom:20px;line-height:1.6">Your location is being shared.<br>Emergency services will be notified.</div>
+    <div style="background:rgba(226,75,74,.1);border:0.5px solid rgba(226,75,74,.3);border-radius:10px;padding:10px;margin-bottom:16px;font-family:'DM Mono',monospace;font-size:12px;color:var(--t2)">
+      📍 3.2017°N, 101.7740°E<br>🏔 Bukit Tabur West Trail<br>⏱ Active for <span id="sosTimer">0:00</span>
+    </div>
+    <button onclick="closeSOS()" style="width:100%;background:var(--rd);border:none;border-radius:12px;padding:14px;color:#fff;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer">Cancel SOS</button>
+  </div>
+</div>
+
+<!-- Shop item modal -->
+<div class="modal-ov" id="shopModal" onclick="if(event.target===this)closeShopModal()">
+  <div class="modal" id="shopModalBody"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ DATA ═══
+const TRAILS=[
+  {id:'tabur',name:'Bukit Tabur West',loc:'Kuala Lumpur',lat:3.2017,lng:101.774,dist:'5.2 km',diff:'Moderate',diffC:'m',type:'Trail',emoji:'🏔',humans:847,elev:'320m',time:'2h 30m',conds:['Clear','Rocky'],desc:'A dramatic quartz ridge hike with sweeping views of Klang Gates Dam and the KL skyline.',wld:2},
+  {id:'gasing',name:'Gasing Hill Loop',loc:'Petaling Jaya',lat:3.1065,lng:101.652,dist:'3.8 km',diff:'Easy',diffC:'e',type:'Trail',emoji:'🌿',humans:1204,elev:'120m',time:'1h 15m',conds:['Clear'],desc:'A lush urban forest loop popular with morning joggers. Well-maintained paths.',wld:2},
+  {id:'titiwangsa',name:'Titiwangsa Lake Gardens',loc:'Kuala Lumpur',lat:3.1738,lng:101.7068,dist:'4.1 km',diff:'Easy',diffC:'e',type:'Urban',emoji:'🏙',humans:2081,elev:'15m',time:'45m',conds:['Clear','Scenic'],desc:'A flat lakeside loop through one of KL\'s most beloved parks.',wld:1},
+  {id:'klcc',name:'KLCC Park Run',loc:'Kuala Lumpur',lat:3.1579,lng:101.7119,dist:'1.3 km',diff:'Easy',diffC:'e',type:'Urban',emoji:'🌆',humans:5320,elev:'0m',time:'15m',conds:['Clear'],desc:'The iconic lap around KLCC Park with the Petronas Twin Towers as your backdrop.',wld:1},
+  {id:'nuang',name:'Gunung Nuang Summit',loc:'Hulu Langat',lat:3.125,lng:101.9,dist:'18.0 km',diff:'Hard',diffC:'h',type:'Peak',emoji:'⛰',humans:312,elev:'1493m',time:'10h',conds:['Muddy'],desc:'The highest peak in Selangor — a challenging full-day expedition.',wld:5},
+  {id:'marathon',name:'KL Standard Chartered Marathon',loc:'Kuala Lumpur',lat:3.1478,lng:101.6953,dist:'42.2 km',diff:'Hard',diffC:'h',type:'Marathon',emoji:'🏃',humans:18402,elev:'180m',time:'4-6h',conds:['Clear'],desc:'Full KL marathon. Every checkpoint verified by World ID.',wld:20},
+  {id:'broga',name:'Broga Hill',loc:'Semenyih',lat:2.9833,lng:101.9167,dist:'3.6 km',diff:'Moderate',diffC:'m',type:'Peak',emoji:'🌄',humans:623,elev:'280m',time:'1h 45m',conds:['Clear','Scenic'],desc:'Famous for golden sunrise views. Short but steep, great panorama.',wld:2},
+  {id:'frim',name:'FRIM Kepong Forest Loop',loc:'Kepong',lat:3.2167,lng:101.6333,dist:'6.2 km',diff:'Easy',diffC:'e',type:'Trail',emoji:'🌲',humans:891,elev:'95m',time:'1h 30m',conds:['Clear'],desc:'Research forest with canopy walkway 30m above ground.',wld:2},
+]
+
+const SHOP_ITEMS=[
+  {id:'s1',name:'Kinvara 14 Running Shoes',brand:'Saucony',cat:'Running',emoji:'👟',price:45,origPrice:60,badge:'Sale',desc:'Lightweight neutral trainer. Perfect for trail runs and road races. Responsive cushioning for long distances.',specs:['Mesh upper','8.3oz weight','Drop: 4mm','Sizes: 6–13']},
+  {id:'s2',name:'Trail Running Vest 5L',brand:'Salomon',cat:'Hiking',emoji:'🎽',price:38,origPrice:null,badge:'New',desc:'Hydration vest with 5L capacity. Bounce-free fit for mountain trails.',specs:['5L capacity','2x soft flask','Reflective','Unisex']},
+  {id:'s3',name:'Forerunner 265 GPS Watch',brand:'Garmin',cat:'Wearables',emoji:'⌚',price:120,origPrice:150,badge:'Sale',desc:'Advanced running dynamics, HRV tracking, and World ID health sync ready.',specs:['AMOLED display','Up to 13hr GPS','HRV status','Sleep tracking']},
+  {id:'s4',name:'Dri-FIT Trail Tee',brand:'Nike',cat:'Apparel',emoji:'👕',price:18,origPrice:null,badge:null,desc:'Sweat-wicking performance tee for hot and humid trail conditions.',specs:['Dri-FIT tech','UV protection','Slim fit','Recycled polyester']},
+  {id:'s5',name:'Trekking Pole Set',brand:'Black Diamond',cat:'Hiking',emoji:'🥢',price:55,origPrice:70,badge:'Sale',desc:'Lightweight carbon poles with ergonomic grip and quick-lock system.',specs:['Carbon fiber','Quick-lock','Cork grip','Foldable']},
+  {id:'s6',name:'Trail Running Shorts',brand:'Patagonia',cat:'Running',emoji:'🩳',price:22,origPrice:null,badge:null,desc:'4-way stretch shorts with liner and 2 zip pockets.',specs:['4-way stretch','Liner included','2 zip pockets','Recycled nylon']},
+  {id:'s7',name:'Heart Rate Monitor',brand:'Polar',cat:'Wearables',emoji:'💓',price:30,origPrice:40,badge:'Sale',desc:'Accurate chest strap HR monitor that pairs with Waymark for real-time tracking.',specs:['ANT+/BT dual','Waterproof','60h battery','Waymark compatible']},
+  {id:'s8',name:'Trail Headlamp 400lm',brand:'Petzl',cat:'Accessories',emoji:'🔦',price:25,origPrice:null,badge:'New',desc:'Compact 400 lumen headlamp for dawn/dusk trail runs.',specs:['400 lumen','IP67 waterproof','React+ tech','60h runtime']},
+  {id:'s9',name:'Electrolyte Gels Pack (12)',brand:'Maurten',cat:'Accessories',emoji:'🧪',price:15,origPrice:null,badge:null,desc:'12x 40g energy gels. Hydrogel technology for fast absorption.',specs:['100mg sodium','25g carbs','Natural ingredients','12 gels']},
+  {id:'s10',name:'Compression Calf Sleeves',brand:'CEP',cat:'Apparel',emoji:'🧦',price:20,origPrice:null,badge:null,desc:'Medical-grade compression for faster recovery after long runs.',specs:['20-30mmHg','Merino blend','Anti-blister','S–XL']},
+]
+
+const FEED_DATA=[
+  {initials:'AH',color:'#0F6E56',name:'Amir Hassan',time:'12 min ago',loc:'KL',trail:'Bukit Tabur West',emoji:'🏔',action:'Checked in · 5.2km',conds:['Clear','Rocky'],wld:2},
+  {initials:'SN',color:'#185FA5',name:'Siti Nur',time:'1h ago',loc:'PJ',trail:'KL Standard Chartered Marathon',emoji:'🏃',action:'Completed · 42.2km',conds:[],wld:20},
+  {initials:'DR',color:'#634AB7',name:'Dani Roslan',time:'2h ago',loc:'PJ',trail:'Gasing Hill Loop',emoji:'🌿',action:'Checked in · 3.8km',conds:['Muddy','Scenic'],wld:2},
+  {initials:'PM',color:'#7A3E10',name:'Priya Menon',time:'3h ago',loc:'KL',trail:'Gunung Nuang Summit',emoji:'⛰',action:'Updated trail info',conds:[],wld:0},
+  {initials:'KN',color:'#0F6E56',name:'Khairul Nizam',time:'4h ago',loc:'KL',trail:'KLCC Park Run',emoji:'🌆',action:'Checked in · 1.3km',conds:['Clear'],wld:1},
+]
+
+const LB_DATA=[
+  {rank:1,initials:'AH',color:'#0F6E56',name:'Amir Hassan',loc:'KL',adv:34,dist:287,wld:68},
+  {rank:2,initials:'SN',color:'#185FA5',name:'Siti Nur',loc:'PJ',adv:29,dist:241,wld:58},
+  {rank:3,initials:'WL',color:'#634AB7',name:'Wei Ling',loc:'KL',adv:26,dist:198,wld:52},
+  {rank:4,initials:'DR',color:'#7A3E10',name:'Dani Roslan',loc:'Subang',adv:22,dist:176,wld:44},
+  {rank:12,initials:'RC',color:'#0F6E56',name:'Raydi Cham',loc:'KL',adv:10,dist:84,wld:20,you:true},
+]
+
+const CONDITIONS_ALL=['Clear','Muddy','Flooded','Scenic','Rocky','Crowded','Windy','Slippery']
+const SOURCES=[{name:'Apple Health',icon:'🍎',avail:true,desc:'Steps, HR, HRV, Sleep'},{name:'Garmin Connect',icon:'⌚',avail:false,desc:'GPS, VO2, Training load'},{name:'Whoop',icon:'💪',avail:false,desc:'Recovery, Strain, Sleep'},{name:'Fitbit',icon:'📊',avail:false,desc:'Steps, Sleep, HR'}]
+
+// ═══ STATE ═══
+let wldBalance=20,verifiedIDs=[],likedFeed=new Set(),currentFilter='All',currentSearch='',currentCat='adventures'
+let appleConnected=false,checkinStep=0,checkinTrail=null,selectedConds=[]
+let shopCat='All',purchasedItems=new Set()
+let leafletMap=null,leafletMarkers=[],gpsMap=null,gpsTrackLine=null,gpsUserMarker=null
+let gpsRunning=false,gpsPaused=false,gpsElapsed=0,gpsInterval=null,gpsSimInterval=null
+let gpsDist=0,gpsStepsCount=0,gpsCalCount=0,gpsSpeedVal=0,gpsHRVal=142
+let gpsTrack=[],gpsCenter=[3.2017,101.774]
+
+// ═══ BOOT ═══
+window.onload=()=>{
+  renderHomeTrails(); renderExploreTrails(); renderFeed()
+  renderLeaderboard(); renderEditList(); renderProfileCIs()
+  renderSourceList(); renderShop()
+  initLeafletMap()
+}
+
+// ═══ TAB SWITCH ═══
+function switchTab(tab){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.classList.remove('on')
+    t.querySelector('.tab-lbl').style.color=''
+    t.querySelectorAll('svg [stroke]').forEach(e=>{if(e.getAttribute('stroke')!=='none')e.setAttribute('stroke','#444')})
+    t.querySelectorAll('svg [fill]').forEach(e=>{if(e.getAttribute('fill')!=='none'&&e.getAttribute('fill')!='')e.setAttribute('fill','#444')})
+  })
+  document.getElementById('s-'+tab).classList.add('on')
+  const el=document.getElementById('tab-'+tab)
+  el.classList.add('on')
+  el.querySelector('.tab-lbl').style.color='var(--g)'
+  el.querySelectorAll('svg [stroke]').forEach(e=>{if(e.getAttribute('stroke')!=='none')e.setAttribute('stroke','#1D9E75')})
+  el.querySelectorAll('svg [fill]').forEach(e=>{if(e.getAttribute('fill')!=='none'&&e.getAttribute('fill')!='')e.setAttribute('fill','#1D9E75')})
+}
+
+// ═══ LEAFLET MAP ═══
+function initLeafletMap(){
+  if(leafletMap)return
+  leafletMap=L.map('leafletMap',{center:[3.15,101.71],zoom:11,zoomControl:false,attributionControl:true})
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(leafletMap)
+  L.control.zoom({position:'bottomright'}).addTo(leafletMap)
+  TRAILS.forEach(t=>{
+    const icon=L.divIcon({className:'',html:`<div style="width:12px;height:12px;border-radius:50%;background:#1D9E75;border:2px solid rgba(29,158,117,.4);box-shadow:0 0 0 6px rgba(29,158,117,.1)"></div>`,iconSize:[12,12],iconAnchor:[6,6]})
+    const m=L.marker([t.lat,t.lng],{icon}).addTo(leafletMap)
+    m.bindPopup(`<div style="background:#111;border-radius:10px;padding:10px;min-width:160px;font-family:'DM Sans',sans-serif;color:white;border:0.5px solid rgba(255,255,255,.08)"><b style="font-size:13px">${t.name}</b><br><span style="font-size:11px;color:#555">${t.dist} · ${t.diff}</span><br><div style="margin-top:6px;display:inline-flex;align-items:center;gap:4px;background:rgba(29,158,117,.1);border-radius:20px;padding:2px 8px"><div style="width:5px;height:5px;border-radius:50%;background:#1D9E75"></div><span style="font-size:10px;color:#1D9E75;font-weight:500">${t.humans.toLocaleString()} verified</span></div></div>`,{className:'',closeButton:false})
+    m.on('click',()=>openCheckin(t.id))
+    leafletMarkers.push({t,m})
+  })
+}
+
+function initGPSMap(center){
+  if(gpsMap){gpsMap.remove();gpsMap=null}
+  setTimeout(()=>{
+    gpsMap=L.map('gpsMap',{center:center||[3.2017,101.774],zoom:15,zoomControl:false,attributionControl:false})
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(gpsMap)
+    gpsTrack=[[center[0],center[1]]]
+    gpsTrackLine=L.polyline(gpsTrack,{color:'#1D9E75',weight:4,opacity:.9}).addTo(gpsMap)
+    const userIcon=L.divIcon({className:'',html:`<div style="width:18px;height:18px;border-radius:50%;background:#1D9E75;border:3px solid rgba(29,158,117,.4);box-shadow:0 0 0 8px rgba(29,158,117,.15)"></div>`,iconSize:[18,18],iconAnchor:[9,9]})
+    gpsUserMarker=L.marker(center,{icon:userIcon}).addTo(gpsMap)
+  },200)
+}
+
+// ═══ EXPLORE SUB VIEWS ═══
+function setExView(view,btn){
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('on'))
+  btn.classList.add('on')
+  document.getElementById('exDiscover').style.display=view==='discover'?'':'none'
+  document.getElementById('exLeaderboard').style.display=view==='leaderboard'?'':'none'
+  document.getElementById('exEdit').style.display=view==='edit'?'':'none'
+  if(view==='discover'&&leafletMap)setTimeout(()=>leafletMap.invalidateSize(),100)
+}
+
+// ═══ TRAIL CARDS ═══
+function trailCard(t){
+  return`<div class="tc" onclick="openCheckin('${t.id}')">
+    <div class="tc-thumb">${t.emoji}</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:5px">
+        <div class="tc-name">${t.name}</div>
+        <span class="diff ${t.diffC}">${t.diff}</span>
+      </div>
+      <div class="tc-meta">${t.loc} · ${t.dist}</div>
+      <div class="vp"><div class="vdot"></div>${t.humans.toLocaleString()} verified humans</div>
+    </div>
+    <span style="color:var(--t4);font-size:16px">›</span>
+  </div>`
+}
+function renderHomeTrails(){document.getElementById('homeTrails').innerHTML=TRAILS.slice(0,4).map(trailCard).join('')}
+function renderExploreTrails(){
+  const f=TRAILS.filter(t=>{
+    const mF=currentFilter==='All'||t.type===currentFilter
+    const mS=!currentSearch||t.name.toLowerCase().includes(currentSearch.toLowerCase())||t.loc.toLowerCase().includes(currentSearch.toLowerCase())
+    return mF&&mS
+  })
+  document.getElementById('exploreCount').textContent=`${f.length} adventures in Malaysia`
+  document.getElementById('exploreTrails').innerHTML=f.length?f.map(trailCard).join(''):`<div style="text-align:center;padding:40px 20px;color:var(--t4);font-size:14px">No adventures found</div>`
+}
+function filterTrails(v){currentSearch=v;renderExploreTrails()}
+function setFilter(f,btn){document.querySelectorAll('.fp').forEach(p=>p.classList.remove('on'));btn.classList.add('on');currentFilter=f;renderExploreTrails()}
+
+// ═══ LEADERBOARD ═══
+function lbVal(d){if(currentCat==='adventures')return d.adv+' adventures';if(currentCat==='distance')return d.dist+'km';return d.wld+' WLD'}
+function renderLeaderboard(){
+  const top3=LB_DATA.slice(0,3),h=[70,100,50],ord=[1,0,2],medals=['🥇','🥈','🥉']
+  document.getElementById('podium').innerHTML=ord.map(i=>{const d=top3[i];return`<div class="pod">
+    <div style="font-size:${i===0?'20px':'16px'}">${medals[i]}</div>
+    <div style="width:${i===0?50:42}px;height:${i===0?50:42}px;border-radius:50%;background:${d.color};display:flex;align-items:center;justify-content:center;font-size:${i===0?13:11}px;font-weight:600;color:#fff">${d.initials}</div>
+    <div style="font-size:10px;color:var(--t3);max-width:56px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap">${d.name.split(' ')[0]}</div>
+    <div style="background:var(--b3);width:${i===0?60:50}px;height:${h[i]}px;border-radius:6px 6px 0 0;${i===0?'border:0.5px solid rgba(239,159,39,.2)':''}display:flex;align-items:flex-end;justify-content:center;padding-bottom:5px">
+      <div style="font-size:10px;font-weight:600;color:${i===0?'var(--am)':'var(--t3)'}">${lbVal(d)}</div>
+    </div></div>`}).join('')
+  document.getElementById('lbList').innerHTML=LB_DATA.slice(3).map(d=>`
+    <div class="lb-row${d.you?' you':''}">
+      <div class="lb-rank">${d.rank}</div>
+      <div class="lb-av" style="background:${d.color}">${d.initials}</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500;color:var(--t1)">${d.name}${d.you?'<span class="you-badge">You</span>':''}</div><div style="font-size:10px;color:var(--t4)">${d.loc}</div></div>
+      <div style="font-size:12px;font-weight:600;color:var(--t2)">${lbVal(d)}</div>
+    </div>`).join('')
+}
+function setPeriod(p,btn){document.querySelectorAll('.pt').forEach(t=>t.classList.remove('on'));btn.classList.add('on');renderLeaderboard()}
+function setCat(c,btn){document.querySelectorAll('.cf').forEach(t=>t.classList.remove('on'));btn.classList.add('on');currentCat=c;renderLeaderboard()}
+
+// ═══ FEED ═══
+function renderFeed(){
+  document.getElementById('feedList').innerHTML=FEED_DATA.map((f,i)=>`
+    <div class="fc">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:11px">
+        <div style="width:34px;height:34px;border-radius:50%;background:${f.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0">${f.initials}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:13px;font-weight:500;color:var(--t1)">${f.name}</span>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="#1D9E75" stroke-width=".9"/><circle cx="5.5" cy="5.5" r="1.8" fill="#1D9E75"/></svg>
+          </div>
+          <div style="font-size:10px;color:var(--t4);margin-top:1px">${f.time} · ${f.loc}</div>
+        </div>
+        ${f.wld>0?`<div style="background:var(--b3);border:0.5px solid var(--br2);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--g)">+${f.wld} WLD</div>`:''}
+      </div>
+      <div style="background:var(--b3);border-radius:var(--rs);padding:9px 11px;display:flex;align-items:center;gap:9px;margin-bottom:${f.conds.length?'9px':'0'}">
+        <span style="font-size:17px">${f.emoji}</span>
+        <div><div style="font-size:13px;font-weight:500;color:var(--t1)">${f.trail}</div><div style="font-size:11px;color:var(--t4);margin-top:1px">${f.action}</div></div>
+      </div>
+      ${f.conds.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px">${f.conds.map(c=>`<span style="font-size:10px;font-weight:500;padding:3px 9px;border-radius:20px;background:var(--b3);border:0.5px solid var(--br2);color:var(--t3)">${c}</span>`).join('')}</div>`:''}
+      <div class="fc-footer">
+        <button class="like-btn" id="like-${i}" onclick="toggleLike(${i})">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 11S1.5 8 1.5 4.5a3 3 0 015-2.2 3 3 0 015 2.2C11.5 8 6.5 11 6.5 11z" stroke="currentColor" stroke-width="1.1" fill="none"/></svg>Like
+        </button>
+        <span style="color:var(--t4);font-size:10px;margin-left:auto">Verified human</span>
+      </div>
+    </div>`).join('')
+}
+function toggleLike(i){const b=document.getElementById(`like-${i}`);likedFeed.has(i)?(likedFeed.delete(i),b.classList.remove('liked')):(likedFeed.add(i),b.classList.add('liked'))}
+
+// ═══ EDIT ═══
+function renderEditList(){
+  document.getElementById('editList').innerHTML=TRAILS.map(t=>`
+    <div class="edit-trail">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:11px">
+        <div style="width:38px;height:38px;border-radius:9px;background:var(--gd);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${t.emoji}</div>
+        <div><div style="font-size:13px;font-weight:500;color:var(--t1)">${t.name}</div><div style="font-size:11px;color:var(--t4)">${t.loc} · ${t.dist}</div></div>
+      </div>
+      <div class="edit-fields">
+        ${['difficulty','distance','conditions','description'].map(f=>`<div class="edit-field" onclick="openEditField('${t.id}','${f}')"><div class="ef-label">${f}</div><div class="ef-val">${f==='difficulty'?t.diff:f==='distance'?t.dist:f==='conditions'?t.conds.slice(0,2).join(', ')||'None':'Edit →'}</div></div>`).join('')}
+      </div>
+    </div>`).join('')
+}
+function openEditField(tid,field){
+  const t=TRAILS.find(x=>x.id===tid)
+  const modal=document.getElementById('modalBody')
+  modal.innerHTML=`<div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:9px"><div style="width:5px;height:5px;border-radius:50%;background:var(--g)"></div><span style="font-size:11px;color:var(--g);font-weight:500">Edit requires World ID</span></div>
+    <div style="font-size:18px;font-weight:600;margin-bottom:3px">Edit ${field}</div>
+    <div style="font-size:13px;color:var(--t3);margin-bottom:16px">${t.name}</div>
+    ${field==='difficulty'?`<div style="display:flex;gap:7px;margin-bottom:16px">${['Easy','Moderate','Hard'].map(d=>`<button onclick="this.parentElement.querySelectorAll('button').forEach(b=>b.style.cssText='');this.style.cssText='background:var(--gg);border-color:var(--g);color:var(--g);border-radius:10px'" style="flex:1;padding:11px;border-radius:10px;border:0.5px solid var(--br2);background:var(--b3);color:var(--t2);font-family:DM Sans,sans-serif;font-size:13px;cursor:pointer">${d}</button>`).join('')}</div>`:field==='distance'?`<input value="${t.dist}" style="width:100%;background:var(--b3);border:0.5px solid var(--br2);border-radius:9px;padding:11px 13px;color:var(--t1);font-family:DM Sans,sans-serif;font-size:14px;outline:none;margin-bottom:16px">`:field==='conditions'?`<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px">${CONDITIONS_ALL.map(c=>`<div onclick="this.classList.toggle('sel')" class="cond-tag${t.conds.includes(c)?' sel':''}">${c}</div>`).join('')}</div>`:`<textarea style="width:100%;background:var(--b3);border:0.5px solid var(--br2);border-radius:9px;padding:11px 13px;color:var(--t1);font-family:DM Sans,sans-serif;font-size:13px;outline:none;resize:none;margin-bottom:16px;height:96px">${t.desc}</textarea>`}
+    <button class="btn-g" onclick="submitEdit()"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="white" stroke-width="1.4"/><circle cx="8.5" cy="8.5" r="2.5" fill="white"/></svg>Submit edit with World ID</button>`
+  document.getElementById('modalOv').classList.add('open')
+}
+function submitEdit(){
+  document.getElementById('modalBody').innerHTML=`<div class="modal-handle"></div><div style="display:flex;flex-direction:column;align-items:center;padding:28px 0"><div style="width:64px;height:64px;border-radius:50%;background:var(--gg);border:1px solid rgba(29,158,117,.3);display:flex;align-items:center;justify-content:center;margin-bottom:14px"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 14l6 6 10-10" stroke="#1D9E75" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div style="font-size:18px;font-weight:600;margin-bottom:6px">Edit submitted!</div><div style="font-size:13px;color:var(--t3)">Verified by World ID · Under review</div></div>`
+  setTimeout(closeModal,1800)
+}
+
+// ═══ HEALTH ═══
+function renderSourceList(){
+  document.getElementById('sourceList').innerHTML=SOURCES.map(s=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:0.5px solid var(--br)">
+      <span style="font-size:17px;width:24px">${s.icon}</span>
+      <div style="flex:1"><div style="font-size:13px;color:var(--t2)">${s.name}</div><div style="font-size:10px;color:var(--t4);margin-top:1px">${s.desc}</div></div>
+      ${s.avail?`<button onclick="connectApple()" style="font-size:11px;font-weight:500;color:var(--g);background:var(--gg);border:none;border-radius:20px;padding:4px 11px;cursor:pointer;font-family:DM Sans,sans-serif">${appleConnected?'Connected':'Connect'}</button>`:`<span style="font-size:10px;color:var(--t4);background:var(--b3);border-radius:20px;padding:2px 8px">V2</span>`}
+    </div>`).join('')
+}
+function connectApple(){
+  const btn=document.getElementById('appleBtn')
+  btn.textContent='Connecting…';btn.style.opacity='.5'
+  setTimeout(()=>{
+    appleConnected=true
+    btn.textContent='✓ Apple Health synced'
+    btn.style.cssText='background:var(--gx);border:0.5px solid rgba(29,158,117,.3);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:500;color:var(--g);font-family:DM Sans,sans-serif;opacity:1'
+    document.getElementById('hRecScore').textContent='78'
+    document.getElementById('hRecScore').style.color='var(--am)'
+    document.getElementById('hRing').setAttribute('stroke','#EF9F27')
+    document.getElementById('hRing').setAttribute('stroke-dashoffset',Math.round(188.5*(1-.78)))
+    document.getElementById('hPct').textContent='78%'
+    document.getElementById('hPct').setAttribute('fill','#EF9F27')
+    document.getElementById('hRecState').textContent='Moderate effort'
+    document.getElementById('hRecDetail').textContent='HRV 58ms · HR 55bpm · Sleep 7.1h  ↑ Apple'
+    renderSourceList(); showToast('🍎 Apple Health connected')
+  },1800)
+}
+
+// ═══ SHOP ═══
+function renderShop(){
+  const items=SHOP_ITEMS.filter(i=>shopCat==='All'||i.cat===shopCat)
+  let html=`<div class="shop-grid">${items.map(item=>`
+    <div class="shop-item" onclick="openShopItem('${item.id}')">
+      <div class="shop-item-img">${item.emoji}</div>
+      <div class="shop-item-body">
+        <div class="shop-item-name">${item.name}${item.badge==='New'?'<span class="badge-new">NEW</span>':item.badge==='Sale'?'<span class="badge-sale">SALE</span>':''}</div>
+        <div class="shop-item-brand">${item.brand}</div>
+        <div class="shop-item-price">
+          <div class="wld-price">⚡${item.price} <small>WLD</small></div>
+          <button class="buy-btn" onclick="event.stopPropagation();buyItem('${item.id}')">${purchasedItems.has(item.id)?'✓ Owned':'Buy'}</button>
+        </div>
+      </div>
+    </div>`).join('')}</div>`
+  document.getElementById('shopGrid').innerHTML=html
+  document.getElementById('shopWld').textContent=wldBalance
+}
+function setShopCat(cat,btn){
+  document.querySelectorAll('.shop-cat').forEach(c=>c.classList.remove('on'))
+  btn.classList.add('on');shopCat=cat;renderShop()
+}
+function openShopItem(id){
+  const item=SHOP_ITEMS.find(x=>x.id===id)
+  const owned=purchasedItems.has(id)
+  const canAfford=wldBalance>=item.price
+  document.getElementById('shopModalBody').innerHTML=`
+    <div class="modal-handle"></div>
+    <div style="text-align:center;font-size:64px;margin-bottom:12px">${item.emoji}</div>
+    <div style="font-size:18px;font-weight:600;margin-bottom:2px">${item.name}</div>
+    <div style="font-size:12px;color:var(--t4);margin-bottom:10px">${item.brand} · ${item.cat}</div>
+    <div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:14px">${item.desc}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:16px">
+      ${item.specs.map(s=>`<div style="background:var(--b3);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--t2)">✓ ${s}</div>`).join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--b3);border-radius:var(--rs);padding:12px 14px;margin-bottom:14px">
+      <div><div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Price</div>
+        <div style="font-size:22px;font-weight:600;color:var(--g)">⚡ ${item.price} WLD</div>
+        ${item.origPrice?`<div style="font-size:11px;color:var(--t4);text-decoration:line-through">⚡ ${item.origPrice} WLD</div>`:''}
+      </div>
+      <div style="text-align:right"><div style="font-size:10px;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Your balance</div>
+        <div style="font-size:16px;font-weight:600;color:${canAfford?'var(--g)':'var(--rd)'}">⚡ ${wldBalance} WLD</div>
+      </div>
+    </div>
+    ${owned?`<button class="btn-g" style="background:var(--b3);color:var(--t2);cursor:default">✓ Already owned</button>`
+    :canAfford?`<button class="btn-g" onclick="buyItem('${id}');closeShopModal()">Buy with WLD</button>`
+    :`<button class="btn-g" style="background:var(--rd);cursor:not-allowed" disabled>Not enough WLD · Need ${item.price-wldBalance} more</button>
+    <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--t4)">Check in to earn more WLD ↑</div>`}`
+  document.getElementById('shopModal').classList.add('open')
+}
+function buyItem(id){
+  const item=SHOP_ITEMS.find(x=>x.id===id)
+  if(purchasedItems.has(id)){showToast('Already owned!');return}
+  if(wldBalance<item.price){showToast(`Need ${item.price-wldBalance} more WLD`);return}
+  purchasedItems.add(id)
+  wldBalance-=item.price
+  updateWLD()
+  renderShop()
+  showToast(`✓ ${item.name} purchased!`)
+}
+function closeShopModal(){document.getElementById('shopModal').classList.remove('open')}
+
+// ═══ CHECK-IN FLOW ═══
+function openCheckin(id){
+  checkinTrail=TRAILS.find(t=>t.id===id)
+  selectedConds=[...checkinTrail.conds]
+  checkinStep=0; renderCheckinStep()
+  document.getElementById('modalOv').classList.add('open')
+}
+function renderCheckinStep(){
+  const t=checkinTrail,modal=document.getElementById('modalBody')
+  if(checkinStep===0){
+    modal.innerHTML=`<div class="modal-handle"></div>
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+        <div style="width:46px;height:46px;border-radius:12px;background:var(--gd);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0">${t.emoji}</div>
+        <div><div style="font-size:18px;font-weight:600">${t.name}</div><div style="font-size:12px;color:var(--t4);margin-top:1px">${t.loc} · ${t.dist}</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--t3);line-height:1.7;margin-bottom:14px">${t.desc}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:13px">
+        ${[['Distance',t.dist],['Elevation',t.elev],['Est. time',t.time]].map(([k,v])=>`<div class="ms-cell"><div class="ms-val">${v}</div><div class="ms-key">${k}</div></div>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--gx);border:0.5px solid rgba(29,158,117,.2);border-radius:10px;padding:11px;margin-bottom:14px">
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--g)"></div>
+        <span style="font-size:13px;color:var(--g);font-weight:500">Earn +${t.wld} WLD for this check-in</span>
+      </div>
+      <button class="btn-g" onclick="checkinStep=1;renderCheckinStep()">Check in here →</button>`
+  }else if(checkinStep===1){
+    modal.innerHTML=`<div class="modal-handle"></div>
+      <button class="btn-back" onclick="checkinStep=0;renderCheckinStep()">‹ Back</button>
+      <div style="font-size:18px;font-weight:600;margin-bottom:3px">Trail conditions</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:16px">How does it look out there?</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px">${CONDITIONS_ALL.map(c=>`<div class="cond-tag${selectedConds.includes(c)?' sel':''}" onclick="toggleCond('${c}',this)">${c}</div>`).join('')}</div>
+      <button class="btn-g" onclick="checkinStep=2;renderCheckinStep()">Continue →</button>`
+  }else if(checkinStep===2){
+    modal.innerHTML=`<div class="modal-handle"></div>
+      <button class="btn-back" onclick="checkinStep=1;renderCheckinStep()">‹ Back</button>
+      <div style="display:flex;justify-content:center;margin-bottom:18px"><div style="width:68px;height:68px;border-radius:20px;background:var(--gg);border:1px solid rgba(29,158,117,.25);display:flex;align-items:center;justify-content:center"><svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="#1D9E75" stroke-width="1.8"/><circle cx="18" cy="18" r="5.5" fill="#1D9E75"/></svg></div></div>
+      <div style="font-size:18px;font-weight:600;text-align:center;margin-bottom:4px">Verify with World ID</div>
+      <div style="font-size:13px;color:var(--t3);text-align:center;margin-bottom:18px;line-height:1.6">Prove you're a unique real human — privately. Zero personal data shared.</div>
+      <div style="margin-bottom:18px">${[['1','Open your World App'],['2','Confirm with iris scan'],['3','Check-in recorded on World Chain']].map(([n,s])=>`<div class="step"><div class="step-n">${n}</div><div style="font-size:13px;color:var(--t2)">${s}</div></div>`).join('')}</div>
+      <button class="btn-g" onclick="doVerify()"><svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="white" stroke-width="1.4"/><circle cx="8.5" cy="8.5" r="2.5" fill="white"/></svg>Open World App to verify</button>
+      <div style="font-size:10px;color:var(--t4);text-align:center;margin-top:9px">Zero-knowledge proof · No biometric data stored</div>`
+  }else if(checkinStep===3){
+    modal.innerHTML=`<div class="modal-handle"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;padding:22px 0">
+        <div style="position:relative;margin-bottom:18px"><div class="spin"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="#1D9E75" stroke-width="1.4" opacity=".3"/><circle cx="11" cy="11" r="3.5" fill="#1D9E75"/></svg></div></div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:5px">Verifying with World ID</div>
+        <div style="font-size:13px;color:var(--t3)">Generating zero-knowledge proof…</div>
+      </div>`
+    setTimeout(()=>{checkinStep=4;renderCheckinStep()},2200)
+  }else if(checkinStep===4){
+    const reward=checkinTrail.wld
+    modal.innerHTML=`<div class="modal-handle"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;padding:18px 0 10px">
+        <div style="width:68px;height:68px;border-radius:50%;background:var(--gg);border:1px solid rgba(29,158,117,.3);display:flex;align-items:center;justify-content:center;margin-bottom:14px"><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M7 16l7 7 11-11" stroke="#1D9E75" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="font-size:20px;font-weight:600;margin-bottom:5px">Check-in verified!</div>
+        <div style="font-size:13px;color:var(--t3);text-align:center;margin-bottom:14px">You're now verified at ${checkinTrail.name}</div>
+        <div style="background:var(--gx);border:0.5px solid rgba(29,158,117,.3);border-radius:16px;padding:14px 28px;text-align:center;margin-bottom:18px">
+          <div style="font-size:10px;color:var(--g);opacity:.6;margin-bottom:3px;letter-spacing:.07em;text-transform:uppercase">WLD EARNED</div>
+          <div style="font-size:34px;font-weight:600;color:var(--g)">+${reward}</div>
+          <div style="font-size:11px;color:var(--g);opacity:.5;margin-top:1px">Recorded on World Chain</div>
+        </div>
+        <button class="btn-g" onclick="launchGPS();closeModal()">🗺 Start GPS tracking →</button>
+        <button onclick="closeModal()" style="background:none;border:none;color:var(--t3);font-family:DM Sans,sans-serif;font-size:13px;cursor:pointer;margin-top:10px">Skip tracking</button>
+      </div>`
+    verifiedIDs.push(checkinTrail.id)
+    wldBalance+=reward
+    updateWLD()
+    showToast(`✓ Checked in · +${reward} WLD earned`)
+  }
+}
+function toggleCond(c,el){selectedConds.includes(c)?selectedConds=selectedConds.filter(x=>x!==c):selectedConds.push(c);el.classList.toggle('sel')}
+function doVerify(){checkinStep=3;renderCheckinStep()}
+
+// ═══ GPS TRACKING ═══
+function launchGPS(){
+  const t=checkinTrail||TRAILS[0]
+  gpsCenter=[t.lat,t.lng]
+  document.getElementById('gpsTrailName').textContent=t.name
+  document.getElementById('gpsScreen').classList.add('on')
+  initGPSMap(gpsCenter)
+  gpsDist=0;gpsStepsCount=0;gpsCalCount=0;gpsElapsed=0;gpsRunning=false;gpsPaused=false
+  document.getElementById('gpsDist').textContent='0.00'
+  document.getElementById('gpsPace').textContent='0:00'
+  document.getElementById('gpsTime').textContent='00:00'
+  document.getElementById('gpsSpeed').textContent='0.0'
+  document.getElementById('gpsSteps').textContent='0'
+  document.getElementById('gpsCal').textContent='0'
+  updateGPSClock()
+  // Auto-start
+  setTimeout(()=>startGPS(),600)
+}
+function startGPS(){
+  if(gpsRunning)return
+  gpsRunning=true;gpsPaused=false
+  document.getElementById('gpsPlayBtn').style.background='rgba(29,158,117,0.3)'
+  document.getElementById('gpsStatusTxt').textContent='Tracking active'
+  document.getElementById('gpsStatusDot').style.background='var(--g)'
+  document.getElementById('playIcon').innerHTML='<rect x="7" y="5" width="4" height="14" rx="2" fill="rgba(255,255,255,0.9)"/><rect x="15" y="5" width="4" height="14" rx="2" fill="rgba(255,255,255,0.9)"/>'
+  gpsInterval=setInterval(()=>{
+    if(!gpsPaused){gpsElapsed++;updateGPSDisplay()}
+  },1000)
+  gpsSimInterval=setInterval(()=>{
+    if(gpsPaused)return
+    // Simulate movement
+    const dLat=(Math.random()-.4)*0.0002,dLng=(Math.random()-.4)*0.0002
+    gpsCenter=[gpsCenter[0]+dLat,gpsCenter[1]+dLng]
+    gpsTrack.push([...gpsCenter])
+    if(gpsTrackLine)gpsTrackLine.setLatLngs(gpsTrack)
+    if(gpsUserMarker)gpsUserMarker.setLatLng(gpsCenter)
+    if(gpsMap)gpsMap.panTo(gpsCenter,{animate:true,duration:.5})
+    // Update metrics
+    gpsDist+=0.008+(Math.random()*.006)
+    gpsStepsCount+=Math.floor(12+Math.random()*6)
+    gpsCalCount+=Math.floor(0.8+Math.random()*.4)
+    gpsSpeedVal=Math.max(3,Math.min(12,gpsSpeedVal+(Math.random()-.5)*2))
+    gpsHRVal=Math.max(120,Math.min(175,gpsHRVal+(Math.random()-.5)*8))
+    document.getElementById('gpsHR').textContent=Math.round(gpsHRVal)
+    document.getElementById('gpsHR').style.color=gpsHRVal>165?'var(--rd)':gpsHRVal>145?'var(--am)':'var(--rd)'
+  },3000)
+}
+function togglePlay(){
+  if(!gpsRunning){startGPS();return}
+  gpsPaused=!gpsPaused
+  if(gpsPaused){
+    document.getElementById('gpsStatusTxt').textContent='Paused'
+    document.getElementById('gpsStatusDot').style.background='var(--am)'
+    document.getElementById('playIcon').innerHTML='<path d="M8 6l12 6-12 6V6z" fill="rgba(255,255,255,0.9)"/>'
+    document.getElementById('gpsPlayBtn').style.background='var(--g)'
+  }else{
+    document.getElementById('gpsStatusTxt').textContent='Tracking active'
+    document.getElementById('gpsStatusDot').style.background='var(--g)'
+    document.getElementById('playIcon').innerHTML='<rect x="7" y="5" width="4" height="14" rx="2" fill="rgba(255,255,255,0.9)"/><rect x="15" y="5" width="4" height="14" rx="2" fill="rgba(255,255,255,0.9)"/>'
+    document.getElementById('gpsPlayBtn').style.background='rgba(29,158,117,0.3)'
+  }
+}
+function togglePause(){togglePlay()}
+function updateGPSDisplay(){
+  const m=Math.floor(gpsElapsed/60),s=gpsElapsed%60
+  document.getElementById('gpsTime').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  document.getElementById('gpsDist').textContent=gpsDist.toFixed(2)
+  document.getElementById('gpsSpeed').textContent=gpsSpeedVal.toFixed(1)
+  document.getElementById('gpsSteps').textContent=gpsStepsCount.toLocaleString()
+  document.getElementById('gpsCal').textContent=gpsCalCount
+  const paceMin=gpsDist>0?Math.floor(gpsElapsed/60/gpsDist):0
+  const paceSec=gpsDist>0?Math.round((gpsElapsed/gpsDist)%60):0
+  document.getElementById('gpsPace').textContent=`${paceMin}:${String(paceSec).padStart(2,'0')}`
+  document.getElementById('gpsElev').textContent=Math.floor(150+gpsDist*30)+'m'
+  updateGPSClock()
+}
+function updateGPSClock(){
+  const now=new Date()
+  document.getElementById('gpsClock').textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+}
+function stopGPS(){
+  clearInterval(gpsInterval);clearInterval(gpsSimInterval)
+  gpsRunning=false
+  document.getElementById('gpsScreen').classList.remove('on')
+}
+function finishGPS(){
+  clearInterval(gpsInterval);clearInterval(gpsSimInterval)
+  gpsRunning=false
+  document.getElementById('gpsScreen').classList.remove('on')
+  showToast(`🏁 Activity saved · ${gpsDist.toFixed(2)}km · ${gpsCalCount} cal`)
+}
+
+// ═══ SOS ═══
+let sosStart=null,sosInterval=null
+function openSOS(){
+  document.getElementById('sosModal').classList.add('open')
+  sosStart=Date.now()
+  sosInterval=setInterval(()=>{
+    const e=Math.floor((Date.now()-sosStart)/1000)
+    document.getElementById('sosTimer').textContent=`${Math.floor(e/60)}:${String(e%60).padStart(2,'0')}`
+  },1000)
+}
+function closeSOS(){
+  document.getElementById('sosModal').classList.remove('open')
+  clearInterval(sosInterval)
+  showToast('SOS cancelled')
+}
+
+// ═══ WLD UPDATE ═══
+function updateWLD(){
+  document.getElementById('wldVal').textContent=wldBalance
+  document.getElementById('homeWld').innerHTML=`${wldBalance} <span style="font-size:13px;font-weight:400;color:var(--t3)">WLD</span>`
+  document.getElementById('homeWldSub').textContent=`Earned from ${verifiedIDs.length+3} verified check-ins`
+  document.getElementById('profWld').textContent=wldBalance
+  document.getElementById('profWldBig').textContent=wldBalance+' WLD'
+  document.getElementById('profAdv').textContent=verifiedIDs.length+24
+  document.getElementById('shopWld').textContent=wldBalance
+  const pill=document.getElementById('wldPill')
+  pill.classList.add('bump');setTimeout(()=>pill.classList.remove('bump'),400)
+  renderProfileCIs()
+}
+
+// ═══ PROFILE CIs ═══
+function renderProfileCIs(){
+  const defaults=[{trail:'Bukit Tabur West',time:'2h ago',emoji:'🏔',wld:2},{trail:'KLCC Park Run',time:'Yesterday',emoji:'🌆',wld:1},{trail:'Gasing Hill Loop',time:'3 days ago',emoji:'🌿',wld:2}]
+  const mine=verifiedIDs.map(id=>{const t=TRAILS.find(x=>x.id===id);return t?{trail:t.name,time:'Just now',emoji:t.emoji,wld:t.wld}:null}).filter(Boolean)
+  document.getElementById('profCIs').innerHTML=[...mine,...defaults].slice(0,6).map(c=>`
+    <div class="ci-row">
+      <div class="ci-icon">${c.emoji}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--t1)">${c.trail}</div><div style="font-size:10px;color:var(--t4);margin-top:1px">${c.time}</div></div>
+      <div style="font-size:12px;font-weight:600;color:var(--g)">+${c.wld} WLD</div>
+    </div>`).join('')
+}
+
+// ═══ MODAL ═══
+function closeModal(){document.getElementById('modalOv').classList.remove('open')}
+
+// ═══ TOAST ═══
+function showToast(msg){
+  const t=document.getElementById('toast')
+  t.textContent=msg;t.classList.add('show')
+  setTimeout(()=>t.classList.remove('show'),3200)
+}
+</script>
+</body>
+</html>
